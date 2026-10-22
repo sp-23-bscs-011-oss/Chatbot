@@ -151,3 +151,5 @@ async def frontend(path: str):
     if not index.is_file():
         raise HTTPException(404, 'Frontend build not found. Run "npm run build" in frontend/.')
     return FileResponse(index, headers={'Cache-Control': 'no-cache'})
+
+

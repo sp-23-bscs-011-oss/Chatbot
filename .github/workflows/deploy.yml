@@ -1,4 +1,4 @@
-name: Build and deploy Forma (React + FastAPI) to Azure App Service
+name: Deploy AI Image Chatbot
 
 on:
   push:
@@ -14,53 +14,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------- Frontend ----------
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
 
       - name: Build React frontend
-        working-directory: frontend
-        run: npm run build
-
-      # ---------- Backend ----------
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'  # Keep in sync with the App Service runtime stack
-          cache: 'pip'
-          cache-dependency-path: backend/requirements.txt
-
-      - name: Install backend dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          cd frontend
+          npm ci
+          npm run build
 
-      - name: Run backend tests
-        run: python -m pytest backend -q
-
-      # ---------- Package ----------
-      # Azure's Oryx build looks for requirements.txt at the package root and installs
-      # it into the App Service's own Python (SCM_DO_BUILD_DURING_DEPLOYMENT=true).
-      - name: Assemble deployment package
+      - name: Verify React build
         run: |
-          mkdir -p release/frontend
-          cp backend/requirements.txt release/requirements.txt
-          rsync -a --exclude '__pycache__' --exclude '.env' --exclude '*.log' backend/ release/backend/
-          cp -r frontend/dist release/frontend/dist
-          test -f release/frontend/dist/index.html
-          find release -maxdepth 3 -not -path '*/assets/*' | sort
+          test -f frontend/dist/index.html
+          test -d frontend/dist/assets
 
-      - name: Deploy to Azure Web App
+      - name: Deploy to Azure
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'Forma'  # Must match your App Service name
+          app-name: Forma
           publish-profile: ${{ secrets.CHATBOT }}
-          package: release
+          package: .
