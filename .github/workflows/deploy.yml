@@ -1,4 +1,4 @@
-name: Deploy Streamlit App to Azure
+name: Build and deploy Forma (React + FastAPI) to Azure App Service
 
 on:
   push:
@@ -11,24 +11,56 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout GitHub Actions
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ---------- Frontend ----------
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build React frontend
+        working-directory: frontend
+        run: npm run build
+
+      # ---------- Backend ----------
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.12'  # Keep in sync with the App Service runtime stack
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
 
-      - name: Create antenv and install dependencies
+      - name: Install backend dependencies
         run: |
-          python -m venv antenv
-          source antenv/bin/activate
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
+
+      - name: Run backend tests
+        run: python -m pytest backend -q
+
+      # ---------- Package ----------
+      # Azure's Oryx build looks for requirements.txt at the package root and installs
+      # it into the App Service's own Python (SCM_DO_BUILD_DURING_DEPLOYMENT=true).
+      - name: Assemble deployment package
+        run: |
+          mkdir -p release/frontend
+          cp backend/requirements.txt release/requirements.txt
+          rsync -a --exclude '__pycache__' --exclude '.env' --exclude '*.log' backend/ release/backend/
+          cp -r frontend/dist release/frontend/dist
+          test -f release/frontend/dist/index.html
+          find release -maxdepth 3 -not -path '*/assets/*' | sort
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'Forma'  # ⚠️ Ensure this matches your App Service name
+          app-name: 'Forma'  # Must match your App Service name
           publish-profile: ${{ secrets.CHATBOT }}
-          package: .
+          package: release

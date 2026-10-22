@@ -7,6 +7,8 @@ from urllib.parse import quote, urlsplit, urlunsplit
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 if __package__:
@@ -77,7 +79,7 @@ class ImageRequest(BaseModel):
 
 async def complete(messages, *, image=False):
     if not settings.azure_openai_api_key or not settings.azure_openai_endpoint:
-        raise HTTPException(503, 'Azure is not configured. Add your credentials to backend/.env and restart the backend.')
+        raise HTTPException(503, 'Azure is not configured. Add your credentials to backend/.env (or the App Service application settings) and restart the backend.')
     url, params, model = azure_request_config()
     payload = {**model, 'messages': messages, 'max_tokens': 6500 if image else 2500, 'temperature': 0.85 if image else 0.7}
     if image:
@@ -128,3 +130,24 @@ async def image(body: ImageRequest):
         return {'title': title[:200], 'description': description[:6000], 'svg': sanitize_svg(data['svg'])}
     except Exception:
         raise HTTPException(502, 'The generated artwork did not pass SVG validation. Please regenerate or simplify your prompt.')
+
+
+# Production frontend: serve the Vite build from frontend/dist on the same origin.
+# Registered last so /api/*, /docs, /redoc and /openapi.json always take precedence.
+FRONTEND_DIST = Path(__file__).resolve().parent.parent / 'frontend' / 'dist'
+
+if (FRONTEND_DIST / 'assets').is_dir():
+    app.mount('/assets', StaticFiles(directory=FRONTEND_DIST / 'assets'), name='assets')
+
+
+@app.get('/{path:path}', include_in_schema=False)
+async def frontend(path: str):
+    if path == 'api' or path.startswith('api/'):
+        raise HTTPException(404, 'Not Found')
+    file = (FRONTEND_DIST / path).resolve()
+    if path and file.is_file() and file.is_relative_to(FRONTEND_DIST):
+        return FileResponse(file)
+    index = FRONTEND_DIST / 'index.html'
+    if not index.is_file():
+        raise HTTPException(404, 'Frontend build not found. Run "npm run build" in frontend/.')
+    return FileResponse(index, headers={'Cache-Control': 'no-cache'})

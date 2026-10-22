@@ -102,7 +102,7 @@ npm.cmd run build
 
 `frontend/dist` contains the frontend production bundle. `npm.cmd run preview` is a local build preview; to use its AI endpoints, add the preview origin (normally `http://localhost:4173` / `http://127.0.0.1:4173`) to `ALLOWED_ORIGINS` and restart the backend.
 
-For deployment, serve `frontend/dist` from a web server with SPA fallback for `/images`, proxy `/api/*` to FastAPI, and run Uvicorn without `--reload`. Set credentials through server environment variables or a backend-only `.env`. This project is a local single-user application: add authentication, per-user storage and quotas, request rate limits, and HTTPS before exposing a paid Azure endpoint publicly.
+For deployment, FastAPI serves `frontend/dist` itself (with SPA fallback for `/images`) on the same origin as `/api/*` and `/docs`. GitHub Actions (`.github/workflows/deploy.yml`) builds the frontend, runs the backend tests, and deploys both to Azure App Service, which runs `gunicorn --bind=0.0.0.0:8000 --timeout 120 -w 2 -k uvicorn_worker.UvicornWorker backend.main:app`. From the project root, `npm run dev` starts both dev servers and `npm run build` builds the frontend. Set credentials through server environment variables or a backend-only `.env`. This project is a local single-user application: add authentication, per-user storage and quotas, request rate limits, and HTTPS before exposing a paid Azure endpoint publicly.
 
 ## API
 

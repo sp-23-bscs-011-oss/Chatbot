@@ -75,3 +75,17 @@ def test_missing_credentials_and_validation(client, monkeypatch):
     assert client.post('/api/chat', json={'messages': [{'role': 'user', 'content': 'Hello'}]}).status_code == 503
     assert client.post('/api/chat', json={'messages': [{'role': 'assistant', 'content': 'Hello'}]}).status_code == 422
     assert client.post('/api/images', json={'prompt': 'x'}).status_code == 422
+
+
+@pytest.mark.skipif(not (main.FRONTEND_DIST / 'index.html').is_file(), reason='frontend not built')
+def test_frontend_served_without_shadowing_api(client):
+    for path in ('/', '/images'):
+        response = client.get(path)
+        assert response.status_code == 200 and '<div id="root">' in response.text
+    asset = next((main.FRONTEND_DIST / 'assets').iterdir()).name
+    assert client.get(f'/assets/{asset}').status_code == 200
+    assert client.get('/api/health').json()['status'] == 'ok'
+    assert client.get('/api/missing').status_code == 404
+    assert client.get('/openapi.json').json()['info']['title'] == 'Forma AI'
+    assert client.get('/docs').status_code == 200
+    assert client.get('/..%2Fbackend%2F.env').text.startswith('<!doctype html>')

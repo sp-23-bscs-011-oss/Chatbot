@@ -1,10 +1,42 @@
+# Dependencies
 node_modules/
+
+# Build output (built by GitHub Actions during deployment)
 dist/
+release/
+release.zip
+
+# Python virtual environments
 .venv/
 venv/
+env/
+antenv/
+
+# Python caches
 __pycache__/
+*.py[cod]
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Package manager caches
 .uv-cache/
 .npm-cache/
+
+# Environment / secrets
 .env
+.env.*
 !.env.example
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
